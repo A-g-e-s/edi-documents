@@ -131,11 +131,12 @@ $pdf = $ssccLabelGenerator->generateLabel(new SsccLabelData(
 
 ---
 
-## Integrace do projektu gen (plán)
+## Integrace do projektu gen
 
-1. SSCC se vygeneruje **při zakládání zásilky** (`ConsignmentService`) a uloží do tabulky `consignment` — atomicky se zásilkou, aby ApiPrint nikdy nestáhl neúplná data bez SSCC etikety.
-2. Ze SSCC se vytvoří etiketa a EDI doklady (DESADV + INVOIC) z dat faktury.
-3. `ApiPrint` (`ConsignmentModel::findLabels`) vrátí navíc URL SSCC etikety, aby vše vyjelo z tiskáren najednou.
+1. EDI se generuje pro zákazníky se zapnutým příznakem `customer.edi` (checkbox „Generovat EDI doklady" ve formuláři zákazníka). GLN strany: BY = `customer.ean`, DP = `address.ean` odběrného místa, IV = `customer.ean_sk` u SK dodávek (jinak BY), SU = GLN z konfigurace + data dodavatele z faktury.
+2. `EdiDocumentService::generateForInvoice()` se volá v `DispatchModel::finishDispatch` hned po vzniku faktury — SSCC (série = `invoice.id`), SSCC etiketa a DESADV + INVOIC XML tedy existují dřív, než ApiPrint uvidí zásilku. Soubory se ukládají do `Storage::DirEdi`, cesty na fakturu (`sscc`, `sscc_label_file`, `desadv_file`, `invoic_file`).
+3. Číslo DESADV = kód výdeje (`orderDispatch->code`), číslo INVOIC = kód faktury.
+4. `ApiPrint` (`ConsignmentModel::findLabels`) vrací navíc `ssccLabelUrl` (tiskne se s ostatními dokumenty) a `desadvXmlUrl` + `invoicXmlUrl` (desktopová aplikace ApiPrint je ukládá do konfigurovatelné složky).
 
 ## Vývoj
 
