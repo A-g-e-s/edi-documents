@@ -43,30 +43,18 @@ Path repository pro lokální vývoj:
 
 ## Configuration (Nette / neon)
 
+Konfigurace je záměrně minimální — stačí GLN dodavatele a SSCC prefix. Plná data dodavatele (adresa, IČO, DIČ) a bankovní spojení se předávají per doklad: SU strana v `parties`, banka přes `InvoicDocument::$bankAccount` (typicky z dat faktury). Config hodnoty slouží jen jako fallback, když v dokladu chybí.
+
 ```neon
 services:
     ediSupplier: Ages\EdiDocuments\Document\Party(
         qualifier: Ages\EdiDocuments\Document\PartyQualifier::Supplier
         gln: '8594000000009'
-        name: 'MyShop s.r.o.'
-        street: 'Ulice 123/4'
-        place: 'Praha 5'
-        postcode: '15000'
-        countryCode: CZ
-        countryName: 'Česká republika'
-        companyId: '12345678'
-        taxId: CZ12345678
-    )
-
-    ediBankAccount: Ages\EdiDocuments\Config\BankAccount(
-        accountNumber: '123456789'
-        bankCode: '0100'
     )
 
     ediConfig: Ages\EdiDocuments\Config\EdiConfig(
         supplier: @ediSupplier
         ssccCompanyPrefix: '859400000'
-        bankAccount: @ediBankAccount
         # testFlag: true                 # testovací zprávy
         # logoPath: %wwwDir%/img/logo.png  # logo na SSCC etiketě
     )
@@ -119,8 +107,9 @@ file_put_contents($dir . $file->filename, $file->content);
 ```
 
 - Adresát zprávy (`receiver`) se bere z `receiverGln`, jinak z GLN strany `BY`.
-- Strana `SU` (dodavatel) se automaticky doplní z `EdiConfig`, pokud v dokladu chybí; u INVOIC se k ní připojí bankovní spojení a variabilní symbol (default = číslo dokladu).
+- Strana `SU` (dodavatel): předej ji v `parties` s plnými daty (typicky z faktury); pokud chybí, doplní se z `EdiConfig`. U INVOIC se k SU připojí bankovní spojení (`InvoicDocument::$bankAccount`, fallback `EdiConfig::$bankAccount`) a variabilní symbol (default = číslo dokladu).
 - INVOIC summary (součty, DPH skupiny 0/12/21 %) se počítá z položek.
+- SSCC etiketa: odesílatele lze předat přes `SsccLabelData::$sender` (fallback `EdiConfig::$supplier`).
 
 ### SSCC etiketa
 

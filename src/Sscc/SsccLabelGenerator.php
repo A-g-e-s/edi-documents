@@ -62,7 +62,7 @@ class SsccLabelGenerator
 
     private function buildHtml(SsccLabelData $label): string
     {
-        $supplier = $this->config->supplier;
+        $supplier = $label->sender ?? $this->config->supplier;
 
         $recipientZipCountry = trim($label->recipientCountry . ' ' . $label->recipientZip);
         $senderName = $supplier->name ?? '';

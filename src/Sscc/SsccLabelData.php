@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Ages\EdiDocuments\Sscc;
 
+use Ages\EdiDocuments\Document\Party;
+
 readonly class SsccLabelData
 {
     public function __construct(
@@ -19,6 +21,7 @@ readonly class SsccLabelData
         public ?float $weightKg = null,
         public ?string $recipientName2 = null,
         public ?string $orderNumber = null,
+        public ?Party $sender = null,
     ) {
     }
 }

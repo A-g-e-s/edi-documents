@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Ages\EdiDocuments\Document\Invoic;
 
+use Ages\EdiDocuments\Config\BankAccount;
 use Ages\EdiDocuments\Document\Party;
 
 /**
@@ -35,6 +36,7 @@ readonly class InvoicDocument
         public float $pricePaid = 0.0,
         public float $roundingDifference = 0.0,
         public ?string $receiverGln = null,
+        public ?BankAccount $bankAccount = null,
     ) {
     }
 }

@@ -46,11 +46,13 @@ class InvoicXmlGenerator extends AbstractOrionXmlGenerator
         $this->appendElement($header, 'order_number', $document->orderNumber);
         $this->appendElement($header, 'despatch_advice_number', $document->despatchAdviceNumber);
 
+        $bankAccount = $document->bankAccount ?? $this->config->bankAccount;
+
         foreach ($parties as $party) {
             $el = $this->appendParty($header, $party, 'party_id');
 
-            if ($party->qualifier === PartyQualifier::Supplier && $this->config->bankAccount !== null) {
-                $bank = $this->config->bankAccount;
+            if ($party->qualifier === PartyQualifier::Supplier && $bankAccount !== null) {
+                $bank = $bankAccount;
                 $this->appendElement($el, 'account_number', $bank->accountNumber);
                 $this->appendElement($el, 'bank_code', $bank->bankCode);
                 $this->appendElement($el, 'bank_name', $bank->bankName);
