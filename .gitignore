@@ -1,0 +1,6 @@
+/vendor/
+/.idea/
+composer.lock
+
+# Důvěrná dokumentace GRiT (jen pro potřeby zákazníka) + vzorové soubory s reálnými údaji
+/doc/
