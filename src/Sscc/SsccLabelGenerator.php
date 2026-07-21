@@ -70,14 +70,11 @@ class SsccLabelGenerator
         $senderZipCity = trim(($supplier->countryCode ?? '') . ' ' . ($supplier->postcode ?? '') . ' ' . ($supplier->place ?? ''));
 
         $date = (new \DateTimeImmutable())->format('d.m.Y');
-        $weight = $label->weightKg !== null
-            ? number_format($label->weightKg, 2, ',', '.') . ' KG'
-            : '';
 
         $logoHtml = '';
         if ($this->config->logoPath !== null && file_exists($this->config->logoPath)) {
             $path = $this->esc($this->config->logoPath);
-            $logoHtml = "<img src=\"{$path}\" style=\"display:block; margin:0 auto; max-width:26mm; max-height:19mm;\" />";
+            $logoHtml = "<img src=\"{$path}\" style=\"display:inline-block; vertical-align:middle; max-width:26mm; max-height:16mm; margin-right:3mm;\" />";
         }
 
         $name2Html = $label->recipientName2 !== null
@@ -86,7 +83,7 @@ class SsccLabelGenerator
 
         $orderNumber = $label->orderNumber ?? $label->reference;
 
-        // Výšky řádků: 22+38+17+11+11+45 = 144 mm
+        // Výšky řádků: 22+45+22+12+43 = 144 mm
         return <<<HTML
 <!DOCTYPE html>
 <html>
@@ -104,26 +101,22 @@ table { width: 100%; border-collapse: collapse; }
 
 <table style="height:144mm; table-layout:fixed;">
 
-  <!-- Řádek 1: Hlavička — 22mm -->
+  <!-- Řádek 1: Logo + SSCC — 22mm -->
   <tr style="height:22mm;">
-    <td style="border-bottom:0.5pt solid #000; padding:0; overflow:hidden;">
+    <td style="border-bottom:1pt solid #000; padding:0; overflow:hidden;">
       <table style="height:22mm;">
         <tr>
-          <td style="width:30mm; border-right:0.5pt solid #000; text-align:center; vertical-align:middle; height:22mm; padding:1mm;">
+          <td style="width:100%; text-align:center; vertical-align:middle; height:22mm; padding:1mm; white-space:nowrap;">
             {$logoHtml}
-          </td>
-          <td style="font-size:6.5pt; vertical-align:top; padding:1.5mm 1.5mm 0 2mm;">
-            <strong>{$this->esc($senderName)}</strong><br>
-            {$this->esc($senderStreet)}<br>
-            {$this->esc($senderZipCity)}
+            <span style="font-size:26pt; font-weight:bold; vertical-align:middle;">SSCC</span>
           </td>
         </tr>
       </table>
     </td>
   </tr>
 
-  <!-- Řádek 2: PRIJEMCE — 38mm -->
-  <tr style="height:38mm;">
+  <!-- Řádek 2: PRIJEMCE — 45mm -->
+  <tr style="height:45mm;">
     <td style="border-bottom:0.5pt solid #000; padding:1mm 1.5mm; vertical-align:top; overflow:hidden;">
       <div class="lbl">PRIJEMCE:</div>
       <div style="font-size:11pt; font-weight:bold; line-height:1.1;">{$this->esc($label->recipientName)}</div>
@@ -134,8 +127,8 @@ table { width: 100%; border-collapse: collapse; }
     </td>
   </tr>
 
-  <!-- Řádek 3: ODESILATEL — 17mm -->
-  <tr style="height:17mm;">
+  <!-- Řádek 3: ODESILATEL — 22mm -->
+  <tr style="height:22mm;">
     <td style="border-bottom:0.5pt solid #000; padding:1mm 1.5mm; vertical-align:top; overflow:hidden;">
       <div class="lbl">ODESILATEL:</div>
       <div style="font-size:7.5pt; font-weight:bold;">{$this->esc($senderName)}</div>
@@ -144,10 +137,10 @@ table { width: 100%; border-collapse: collapse; }
     </td>
   </tr>
 
-  <!-- Řádek 4: Objednávka + datum — 11mm -->
-  <tr style="height:11mm;">
+  <!-- Řádek 4: Objednávka + datum — 12mm -->
+  <tr style="height:12mm;">
     <td style="border-bottom:0.5pt solid #000; padding:0; overflow:hidden;">
-      <table style="height:11mm;">
+      <table style="height:12mm;">
         <tr>
           <td style="width:50%; border-right:0.5pt solid #000; padding:1mm 1.5mm; vertical-align:top;">
             <div class="lbl">Cislo objednavky:</div>
@@ -162,30 +155,8 @@ table { width: 100%; border-collapse: collapse; }
     </td>
   </tr>
 
-  <!-- Řádek 5: Colli + hmotnost + doklad — 11mm -->
-  <tr style="height:11mm;">
-    <td style="border-bottom:0.5pt solid #000; padding:0; overflow:hidden;">
-      <table style="height:11mm;">
-        <tr>
-          <td style="width:33%; border-right:0.5pt solid #000; padding:1mm; vertical-align:top;">
-            <div class="lbl">Pocet colli:</div>
-            <div class="bold">{$label->parcelNumber}/{$label->totalParcels}</div>
-          </td>
-          <td style="width:34%; border-right:0.5pt solid #000; padding:1mm; vertical-align:top;">
-            <div class="lbl">Hmotnost:</div>
-            <div class="bold">{$weight}</div>
-          </td>
-          <td style="padding:1mm; vertical-align:top;">
-            <div class="lbl">Doklad:</div>
-            <div class="bold">{$this->esc($label->reference)}</div>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-
-  <!-- Řádek 6: Čárový kód — 45mm -->
-  <tr style="height:45mm;">
+  <!-- Řádek 5: Čárový kód — 43mm -->
+  <tr style="height:43mm;">
     <td style="text-align:center; vertical-align:middle; padding:2mm 4mm;">
       <barcode code="00{$label->sscc}" type="C128C" height="2" size="1" text="0" />
       <br>
