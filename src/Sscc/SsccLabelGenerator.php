@@ -137,18 +137,22 @@ table { width: 100%; border-collapse: collapse; }
     </td>
   </tr>
 
-  <!-- Řádek 4: Objednávka + datum — 12mm -->
+  <!-- Řádek 4: Objednávka + datum + číslo jednotky — 12mm -->
   <tr style="height:12mm;">
     <td style="border-bottom:0.5pt solid #000; padding:0; overflow:hidden;">
       <table style="height:12mm;">
         <tr>
-          <td style="width:50%; border-right:0.5pt solid #000; padding:1mm 1.5mm; vertical-align:top;">
+          <td style="width:38%; border-right:0.5pt solid #000; padding:1mm 1.5mm; vertical-align:top;">
             <div class="lbl">Cislo objednavky:</div>
             <div class="bold">{$this->esc($orderNumber)}</div>
           </td>
-          <td style="padding:1mm 1.5mm; vertical-align:top;">
+          <td style="width:24%; border-right:0.5pt solid #000; padding:1mm 1.5mm; vertical-align:top;">
             <div class="lbl">Datum zasilky:</div>
             <div class="bold">{$date}</div>
+          </td>
+          <td style="padding:0.5mm 1.5mm; vertical-align:middle; text-align:center; white-space:nowrap;">
+            <div class="lbl">{$this->esc($label->unitLabel)}:</div>
+            <div style="font-size:15pt; font-weight:bold; line-height:1;">{$label->parcelNumber} / {$label->totalParcels}</div>
           </td>
         </tr>
       </table>

@@ -22,6 +22,8 @@ readonly class SsccLabelData
         public ?string $recipientName2 = null,
         public ?string $orderNumber = null,
         public ?Party $sender = null,
+        /** Označení jednotky na etiketě, např. „Paleta 2 / 3“. */
+        public string $unitLabel = 'Paleta',
     ) {
     }
 }

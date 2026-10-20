@@ -10,15 +10,18 @@ use Ages\EdiDocuments\EdiException;
 /**
  * Generátor zprávy ORION DESADV XML (dokumentace v. 3.1.8).
  *
- * Model odpovídá provozu: jeden dodací list = jedna obalová jednotka,
- * proto obsahuje vždy jediný <item> s package_reference 1E a jedním SSCC kódem.
+ * Každá obalová jednotka (paleta) je jeden <item> v line_items s vlastním
+ * package_number, SSCC kódem a seznamem artiklů, které jsou v ní fyzicky uložené.
  */
 class DesadvXmlGenerator extends AbstractOrionXmlGenerator
 {
     public function generate(DesadvDocument $document, ?\DateTimeImmutable $createdAt = null): EdiDocumentFile
     {
-        if ($document->articles === []) {
-            throw new EdiException('Dodací list musí obsahovat alespoň jednu položku.');
+        $packages = $document->packages();
+        foreach ($packages as $package) {
+            if ($package->articles === []) {
+                throw new EdiException(sprintf('Obalová jednotka %d (SSCC %s) neobsahuje žádnou položku.', $package->number, $package->ssccCode));
+            }
         }
 
         $parties = $this->partiesWithSupplier($document->parties);
@@ -41,29 +44,33 @@ class DesadvXmlGenerator extends AbstractOrionXmlGenerator
         }
 
         $lineItems = $this->appendChild($body, 'line_items');
-        $package = $this->appendChild($lineItems, 'item');
-        $this->appendElement($package, 'package_number', '1');
-        $this->appendElement($package, 'package_reference', '1E');
-        $this->appendElement($package, 'sscc_code', $document->ssccCode);
+        // Číslo řádku (item_number) běží souvisle přes všechny jednotky, aby byl v dokladu jednoznačný.
+        $lineNumber = 0;
+        foreach ($packages as $package) {
+            $packageEl = $this->appendChild($lineItems, 'item');
+            $this->appendElement($packageEl, 'package_number', (string) $package->number);
+            $this->appendElement($packageEl, 'package_reference', $package->packageReference);
+            $this->appendElement($packageEl, 'sscc_code', $package->ssccCode);
 
-        $articles = $this->appendChild($package, 'articles');
-        foreach ($document->articles as $index => $article) {
-            $el = $this->appendChild($articles, 'article');
-            $this->appendElement($el, 'item_number', (string) ($index + 1));
-            $this->appendElement($el, 'article_gtin', $article->gtin);
-            $this->appendElement($el, 'article_id_supplier', $article->supplierArticleId);
-            $this->appendElement($el, 'article_id_buyer', $article->buyerArticleId ?? '');
-            $this->appendElement($el, 'item_type', $article->itemType);
-            $this->appendElement($el, 'article_name', $article->name);
-            $this->appendElement($el, 'quantity', $this->formatNumber($article->quantity));
-            $this->appendElement($el, 'unit', $article->unit);
-            $this->appendElement($el, 'number_of_units', $this->formatNumber($article->numberOfUnits));
-            $this->appendElement($el, 'order_number', $article->orderNumber ?? $document->orderNumber);
-            $this->appendElement($el, 'supplier_order_number', $article->supplierOrderNumber);
+            $articles = $this->appendChild($packageEl, 'articles');
+            foreach ($package->articles as $article) {
+                $el = $this->appendChild($articles, 'article');
+                $this->appendElement($el, 'item_number', (string) ++$lineNumber);
+                $this->appendElement($el, 'article_gtin', $article->gtin);
+                $this->appendElement($el, 'article_id_supplier', $article->supplierArticleId);
+                $this->appendElement($el, 'article_id_buyer', $article->buyerArticleId ?? '');
+                $this->appendElement($el, 'item_type', $article->itemType);
+                $this->appendElement($el, 'article_name', $article->name);
+                $this->appendElement($el, 'quantity', $this->formatNumber($article->quantity));
+                $this->appendElement($el, 'unit', $article->unit);
+                $this->appendElement($el, 'number_of_units', $this->formatNumber($article->numberOfUnits));
+                $this->appendElement($el, 'order_number', $article->orderNumber ?? $document->orderNumber);
+                $this->appendElement($el, 'supplier_order_number', $article->supplierOrderNumber);
+            }
         }
 
         $summary = $this->appendChild($body, 'summary');
-        $this->appendElement($summary, 'number_of_items', (string) count($document->articles));
+        $this->appendElement($summary, 'number_of_items', (string) $lineNumber);
 
         return new EdiDocumentFile(
             filename: sprintf('desadv_%s.xml', $document->docNumber),

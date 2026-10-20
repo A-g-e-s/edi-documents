@@ -2,7 +2,7 @@
 
 PHP knihovna pro generování EDI dokladů ve formátu **ORION XML** (GRiT) — dodací list **DESADV** a faktura **INVOIC** — včetně generátoru **SSCC kódů** (GS1) a **SSCC etikety** (PDF 100×150 mm).
 
-Model odpovídá provozu: **jedna obalová jednotka = jedna faktura = jeden DESADV + jeden INVOIC + jedno SSCC**. Posílají-li se 3 palety, vzniknou 3 sady dokladů.
+Model odpovídá provozu: **jedna dodávka = jedna faktura = jeden DESADV + jeden INVOIC**. Zboží může být rozdělené do více obalových jednotek (palet) – každá má vlastní **SSCC**, vlastní `<item>` v DESADV s obsahem a vlastní stránku SSCC etikety („Paleta 2 / 3“).
 
 ---
 
@@ -88,24 +88,29 @@ Generátory vrací `EdiDocumentFile` (`filename` + `content`, UTF-8). Názvy sou
 $file = $desadvGenerator->generate(new DesadvDocument(
     docNumber: '826400154',
     issueDate: new DateTimeImmutable(),
-    ssccCode: $sscc,
+    ssccCode: null,
     parties: [$buyer, $deliveryParty, $invoicee],   // SU se doplní z konfigurace
-    articles: [
-        new DesadvArticle(
-            gtin: '6424002005780',
-            name: 'Fiskars FF Silikonová mašlovačka',
-            quantity: 1,
-            supplierArticleId: '1023614',
-            orderNumber: 'OB26127268',
-            supplierOrderNumber: '825602536',
-        ),
-    ],
     orderNumber: 'OB26127268',
+    packages: [
+        new DesadvPackage(number: 1, ssccCode: $sscc1, articles: [
+            new DesadvArticle(
+                gtin: '6424002005780',
+                name: 'Fiskars FF Silikonová mašlovačka',
+                quantity: 1,
+                supplierArticleId: '1023614',
+                orderNumber: 'OB26127268',
+                supplierOrderNumber: '825602536',
+            ),
+        ]),
+        new DesadvPackage(number: 2, ssccCode: $sscc2, articles: [/* … */]),
+    ],
 ));
 
 file_put_contents($dir . $file->filename, $file->content);
 ```
 
+- Každá `DesadvPackage` = jeden `<item>` v `line_items` (`package_number`, `package_reference` default `1E`, `sscc_code`, `articles`). `item_number` artiklů běží souvisle přes všechny jednotky, `summary/number_of_items` = počet všech artiklů.
+- Zpětně kompatibilně lze místo `packages` předat jedinou jednotku přes `ssccCode` + `articles`.
 - Adresát zprávy (`receiver`) se bere z `receiverGln`, jinak z GLN strany `BY`.
 - Strana `SU` (dodavatel): předej ji v `parties` s plnými daty (typicky z faktury); pokud chybí, doplní se z `EdiConfig`. U INVOIC se k SU připojí bankovní spojení (`InvoicDocument::$bankAccount`, fallback `EdiConfig::$bankAccount`) a variabilní symbol (default = číslo dokladu).
 - INVOIC summary (součty, DPH skupiny 0/12/21 %) se počítá z položek.
@@ -113,7 +118,7 @@ file_put_contents($dir . $file->filename, $file->content);
 
 ### SSCC etiketa
 
-PDF 100×150 mm, GS1-128 čárový kód s AI (00). Jedna strana na obalovou jednotku.
+PDF 100×150 mm, GS1-128 čárový kód s AI (00). Jedna strana na obalovou jednotku – `generateLabels([...])` vrátí jedno PDF se všemi stranami. Na etiketě je označení jednotky `{unitLabel} {parcelNumber} / {totalParcels}` (default „Paleta 1 / 1“).
 
 ```php
 $pdf = $ssccLabelGenerator->generateLabel(new SsccLabelData(
@@ -126,6 +131,8 @@ $pdf = $ssccLabelGenerator->generateLabel(new SsccLabelData(
     reference: '8261500157',      // číslo dokladu
     orderNumber: 'OB26127268',
     weightKg: 245.5,
+    parcelNumber: 2,
+    totalParcels: 3,
 ));
 ```
 
@@ -134,9 +141,10 @@ $pdf = $ssccLabelGenerator->generateLabel(new SsccLabelData(
 ## Integrace do projektu gen
 
 1. EDI se generuje pro zákazníky se zapnutým příznakem `customer.edi` (checkbox „Generovat EDI doklady" ve formuláři zákazníka). GLN strany: BY = `customer.ean`, DP = `address.ean` odběrného místa, IV = `customer.ean_sk` u SK dodávek (jinak BY), SU = GLN z konfigurace + data dodavatele z faktury.
-2. `EdiDocumentService::generateForInvoice()` se volá v `DispatchModel::finishDispatch` hned po vzniku faktury — SSCC (série = `invoice.id`), SSCC etiketa a DESADV + INVOIC XML tedy existují dřív, než ApiPrint uvidí zásilku. Soubory se ukládají do `Storage::DirEdi`, cesty na fakturu (`sscc`, `sscc_label_file`, `desadv_file`, `invoic_file`).
-3. Číslo DESADV = kód výdeje (`orderDispatch->code`), číslo INVOIC = kód faktury.
-4. `ApiPrint` (`ConsignmentModel::findLabels`) vrací navíc `ssccLabelUrl` (tiskne se s ostatními dokumenty) a `desadvXmlUrl` + `invoicXmlUrl` (desktopová aplikace ApiPrint je ukládá do konfigurovatelné složky).
+2. Skladník ve čtečce (GapiFlow) skládá zboží už při vychystávání do očíslovaných obalových jednotek (`order_dispatch_package` + `order_dispatch_package_item`), typy jednotek se propíšou do obalů pro dopravce.
+3. `EdiDocumentService::generateForInvoice()` se volá v `DispatchModel::finishDispatch` hned po vzniku faktury — každá jednotka dostane SSCC (série = id jednotky, řada začíná nad `MAX(invoice.id)`), vznikne SSCC etiketa (strana na jednotku) a DESADV + INVOIC XML dřív, než ApiPrint uvidí zásilku. Soubory se ukládají do `Storage::DirEdi`, cesty na fakturu (`sscc_label_file`, `desadv_file`, `invoic_file`). Starší faktury mají jediné SSCC v `invoice.sscc` (série = `invoice.id`).
+4. Číslo DESADV = kód výdeje (`orderDispatch->code`), číslo INVOIC = kód faktury.
+5. `ApiPrint` (`ConsignmentModel::findLabels`) vrací navíc `ssccLabelUrl` (tiskne se s ostatními dokumenty) a `desadvXmlUrl` + `invoicXmlUrl` (desktopová aplikace ApiPrint je ukládá do konfigurovatelné složky).
 
 ## Vývoj
 
